@@ -22,6 +22,10 @@ mongoose.connect(mongoURI)
   .catch(err => console.error("MongoDB connection error:", err));
 
 // Routes
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'Portfolio Backend API Running' });
+});
+
 app.post('/api/contact', async (req, res) => {
     try {
         const { name, email, message } = req.body;
