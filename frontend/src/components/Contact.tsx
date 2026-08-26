@@ -7,11 +7,19 @@ export function Contact() {
   const [inquiryType, setInquiryType] = useState<'General' | 'Project'>('General');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
     setErrorMessage('');
+    setSuccessMessage('');
+
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+      setErrorMessage('Please fill in all required fields.');
+      setStatus('error');
+      return;
+    }
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -21,16 +29,18 @@ export function Contact() {
         body: JSON.stringify({ ...formData, inquiryType })
       });
       
-      if (response.ok) {
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.success) {
         setStatus('success');
+        setSuccessMessage(data?.message || 'Your message has been sent successfully.');
         setFormData({ name: '', email: '', message: '' });
       } else {
-        const data = await response.json().catch(() => null);
-        setErrorMessage(data?.error || 'Failed to send message. Please ensure the backend is configured.');
+        setErrorMessage(data?.message || data?.error || 'Unable to send your message. Please try again.');
         setStatus('error');
       }
     } catch (err) {
-      setErrorMessage('Failed to connect to backend server.');
+      setErrorMessage('Unable to connect to the server. Please check your internet connection.');
       setStatus('error');
     }
   };
@@ -163,12 +173,12 @@ export function Contact() {
 
               {status === 'success' && (
                 <p className="text-emerald-400 text-xs font-semibold text-center mt-2">
-                  ✓ Message sent! I'll get back to you within 24 hours.
+                  ✓ {successMessage || "Your message has been sent successfully."}
                 </p>
               )}
               {status === 'error' && (
                 <p className="text-red-400 text-xs font-semibold text-center mt-2">
-                  ⚠️ {errorMessage || 'Failed to send message. Please check server configuration.'}
+                  ⚠️ {errorMessage || 'Unable to send your message. Please try again.'}
                 </p>
               )}
             </form>
