@@ -38,6 +38,7 @@ const getTransporter = () => {
     host: 'smtp.gmail.com',
     port: 465,
     secure: true, // SSL
+    family: 4, // Force IPv4 to prevent ENETUNREACH on Render
     auth: {
       user: process.env.EMAIL_USER || 'vinaybarrenkula@gmail.com',
       pass: process.env.EMAIL_PASS // App Password from Google Account
