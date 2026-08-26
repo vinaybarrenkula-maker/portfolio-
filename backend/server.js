@@ -28,13 +28,21 @@ if (mongoURI) {
 }
 
 // Nodemailer Transporter setup (for sending query emails)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER || 'vinaybarrenkula@gmail.com',
-    pass: process.env.EMAIL_PASS // App Password from Google Account
-  }
-});
+let transporter = null;
+if (process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER || 'vinaybarrenkula@gmail.com',
+      pass: process.env.EMAIL_PASS // App Password from Google Account
+    },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000
+  });
+} else {
+  console.warn("⚠️ WARNING: EMAIL_PASS is not set in backend/.env. Email notifications will NOT be sent.");
+}
 
 // Routes
 app.get('/', (req, res) => {
@@ -59,11 +67,12 @@ app.post('/api/contact', async (req, res) => {
             }
         }
 
-        // 2. Send Email Notification if EMAIL_PASS is set
+        // 2. Send Email Notification
         if (process.env.EMAIL_PASS) {
             try {
                 const mailOptions = {
-                    from: `"${name}" <${email}>`,
+                    from: `"${name}" <${process.env.EMAIL_USER || 'vinaybarrenkula@gmail.com'}>`,
+                    replyTo: email,
                     to: process.env.EMAIL_TO || 'vinaybarrenkula@gmail.com',
                     subject: `New Portfolio Inquiry [${inquiryType || 'General'}]: ${name}`,
                     html: `
@@ -81,11 +90,27 @@ app.post('/api/contact', async (req, res) => {
                     `
                 };
 
-                await transporter.sendMail(mailOptions);
-                console.log(`Email notification sent to ${process.env.EMAIL_TO || 'vinaybarrenkula@gmail.com'}`);
+                const mailTransporter = transporter || nodemailer.createTransport({
+                    service: 'gmail',
+                    auth: {
+                        user: process.env.EMAIL_USER || 'vinaybarrenkula@gmail.com',
+                        pass: process.env.EMAIL_PASS
+                    },
+                    connectionTimeout: 10000,
+                    greetingTimeout: 10000,
+                    socketTimeout: 10000
+                });
+
+                await mailTransporter.sendMail(mailOptions);
+                console.log(`✅ Email notification sent to ${process.env.EMAIL_TO || 'vinaybarrenkula@gmail.com'}`);
             } catch (mailErr) {
-                console.error("Email send warning:", mailErr.message);
+                console.error("❌ Email send error:", mailErr.message);
+                // Return status so caller knows email dispatch had an error if required
+                return res.status(500).json({ error: `Failed to send email: ${mailErr.message}` });
             }
+        } else {
+            console.warn("⚠️ Email not sent because EMAIL_PASS is missing in backend/.env");
+            return res.status(500).json({ error: 'Email service not configured. Please set EMAIL_PASS in backend/.env' });
         }
 
         res.status(201).json({ success: true, message: 'Inquiry received successfully!' });

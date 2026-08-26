@@ -6,10 +6,12 @@ export function Contact() {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [inquiryType, setInquiryType] = useState<'General' | 'Project'>('General');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
+    setErrorMessage('');
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -23,9 +25,12 @@ export function Contact() {
         setStatus('success');
         setFormData({ name: '', email: '', message: '' });
       } else {
+        const data = await response.json().catch(() => null);
+        setErrorMessage(data?.error || 'Failed to send message. Please ensure the backend is configured.');
         setStatus('error');
       }
     } catch (err) {
+      setErrorMessage('Failed to connect to backend server.');
       setStatus('error');
     }
   };
@@ -163,7 +168,7 @@ export function Contact() {
               )}
               {status === 'error' && (
                 <p className="text-red-400 text-xs font-semibold text-center mt-2">
-                  ⚠️ Failed to send message. Please ensure the backend is running.
+                  ⚠️ {errorMessage || 'Failed to send message. Please check server configuration.'}
                 </p>
               )}
             </form>
