@@ -6,6 +6,11 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const nodemailer = require('nodemailer');
 
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+
 const Contact = require('./models/Contact');
 
 const app = express();
@@ -27,21 +32,24 @@ if (mongoURI) {
   console.warn("WARNING: MONGO_URI environment variable is not set on server.");
 }
 
-// Nodemailer Transporter setup (for sending query emails)
-let transporter = null;
-if (process.env.EMAIL_PASS) {
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
+// Helper to create Nodemailer Transporter using IPv4 & Port 465
+const getTransporter = () => {
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // SSL
     auth: {
       user: process.env.EMAIL_USER || 'vinaybarrenkula@gmail.com',
       pass: process.env.EMAIL_PASS // App Password from Google Account
     },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,
-    socketTimeout: 10000
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000
   });
-} else {
-  console.warn("⚠️ WARNING: EMAIL_PASS is not set in backend/.env. Email notifications will NOT be sent.");
+};
+
+if (!process.env.EMAIL_PASS) {
+  console.warn("⚠️ WARNING: EMAIL_PASS is not set in backend environment. Email notifications will NOT be sent.");
 }
 
 // Routes
@@ -90,27 +98,16 @@ app.post('/api/contact', async (req, res) => {
                     `
                 };
 
-                const mailTransporter = transporter || nodemailer.createTransport({
-                    service: 'gmail',
-                    auth: {
-                        user: process.env.EMAIL_USER || 'vinaybarrenkula@gmail.com',
-                        pass: process.env.EMAIL_PASS
-                    },
-                    connectionTimeout: 10000,
-                    greetingTimeout: 10000,
-                    socketTimeout: 10000
-                });
-
+                const mailTransporter = getTransporter();
                 await mailTransporter.sendMail(mailOptions);
                 console.log(`✅ Email notification sent to ${process.env.EMAIL_TO || 'vinaybarrenkula@gmail.com'}`);
             } catch (mailErr) {
                 console.error("❌ Email send error:", mailErr.message);
-                // Return status so caller knows email dispatch had an error if required
                 return res.status(500).json({ error: `Failed to send email: ${mailErr.message}` });
             }
         } else {
-            console.warn("⚠️ Email not sent because EMAIL_PASS is missing in backend/.env");
-            return res.status(500).json({ error: 'Email service not configured. Please set EMAIL_PASS in backend/.env' });
+            console.warn("⚠️ Email not sent because EMAIL_PASS is missing in server environment");
+            return res.status(500).json({ error: 'Email service not configured. Please set EMAIL_PASS in Render Environment Variables' });
         }
 
         res.status(201).json({ success: true, message: 'Inquiry received successfully!' });
